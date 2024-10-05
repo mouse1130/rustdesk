@@ -469,8 +469,12 @@ class InputModel {
 
   KeyEventResult handleRawKeyEvent(RawKeyEvent e) {
     if (isViewOnly) return KeyEventResult.handled;
-    if ((isDesktop || isWebDesktop) && !isInputSourceFlutter) {
-      return KeyEventResult.handled;
+    if (!isInputSourceFlutter) {
+      if (isDesktop) {
+        return KeyEventResult.handled;
+      } else if (isWeb) {
+        return KeyEventResult.ignored;
+      }
     }
 
     final key = e.logicalKey;
@@ -508,7 +512,7 @@ class InputModel {
     }
 
     // * Currently mobile does not enable map mode
-    if ((isDesktop || isWebDesktop) && keyboardMode == 'map') {
+    if ((isDesktop || isWebDesktop) && keyboardMode == kKeyMapMode) {
       mapKeyboardModeRaw(e);
     } else {
       legacyKeyboardModeRaw(e);
@@ -519,8 +523,12 @@ class InputModel {
 
   KeyEventResult handleKeyEvent(KeyEvent e) {
     if (isViewOnly) return KeyEventResult.handled;
-    if ((isDesktop || isWebDesktop) && !isInputSourceFlutter) {
-      return KeyEventResult.handled;
+    if (!isInputSourceFlutter) {
+      if (isDesktop) {
+        return KeyEventResult.handled;
+      } else if (isWeb) {
+        return KeyEventResult.ignored;
+      }
     }
     if (isWindows || isLinux) {
       // Ignore meta keys. Because flutter window will loose focus if meta key is pressed.
@@ -537,7 +545,7 @@ class InputModel {
     }
 
     // * Currently mobile does not enable map mode
-    if ((isDesktop || isWebDesktop)) {
+    if ((isDesktop || isWebDesktop) && keyboardMode == kKeyMapMode) {
       // FIXME: e.character is wrong for dead keys, eg: ^ in de
       newKeyboardMode(
           e.character ?? '',
@@ -783,6 +791,9 @@ class InputModel {
     _flingTimer?.cancel();
     if (!isInputSourceFlutter) {
       bind.sessionEnterOrLeave(sessionId: sessionId, enter: enter);
+    }
+    if (!isWeb && enter) {
+      bind.setCurSessionId(sessionId: sessionId);
     }
   }
 

@@ -4,6 +4,7 @@ import 'dart:convert';
 import 'dart:typed_data';
 import 'package:flutter/foundation.dart';
 import 'package:uuid/uuid.dart';
+import 'dart:html' as html;
 
 import 'package:flutter_hbb/consts.dart';
 
@@ -186,7 +187,7 @@ class RustdeskImpl {
   Future<void> sessionToggleOption(
       {required UuidValue sessionId, required String value, dynamic hint}) {
     return Future(
-        () => js.context.callMethod('setByName', ['toggle_option', value]));
+        () => js.context.callMethod('setByName', ['option:toggle', value]));
   }
 
   Future<void> sessionTogglePrivacyMode(
@@ -195,8 +196,8 @@ class RustdeskImpl {
       required bool on,
       dynamic hint}) {
     return Future(() => js.context.callMethod('setByName', [
-          'toggle_option',
-          jsonEncode({implKey, on})
+          'toggle_privacy_mode',
+          jsonEncode({'impl_key': implKey, 'on': on})
         ]));
   }
 
@@ -234,7 +235,7 @@ class RustdeskImpl {
   }
 
   String getLocalKbLayoutType({dynamic hint}) {
-    throw js.context.callMethod('getByName', ['option:local', 'kb_layout']);
+    return js.context.callMethod('getByName', ['option:local', 'kb_layout']);
   }
 
   Future<void> setLocalKbLayoutType(
@@ -351,7 +352,11 @@ class RustdeskImpl {
 
   bool sessionIsKeyboardModeSupported(
       {required UuidValue sessionId, required String mode, dynamic hint}) {
-    return mode == kKeyLegacyMode;
+    if (mainGetInputSource(hint: hint) == 'Input source 1') {
+      return [kKeyMapMode, kKeyTranslateMode].contains(mode);
+    } else {
+      return [kKeyLegacyMode, kKeyMapMode].contains(mode);
+    }
   }
 
   bool sessionIsMultiUiSession({required UuidValue sessionId, dynamic hint}) {
@@ -390,9 +395,9 @@ class RustdeskImpl {
     return Future(() => js.context.callMethod('setByName', [
           'switch_display',
           jsonEncode({
-            isDesktop: isDesktop,
-            sessionId: sessionId.toString(),
-            value: value
+            'isDesktop': isDesktop,
+            'sessionId': sessionId.toString(),
+            'value': value
           })
         ]));
   }
@@ -415,9 +420,20 @@ class RustdeskImpl {
         ]));
   }
 
+  Future<void> sessionHandleFlutterRawKeyEvent(
+      {required UuidValue sessionId,
+      required String name,
+      required int platformCode,
+      required int positionCode,
+      required int lockModes,
+      required bool downOrUp,
+      dynamic hint}) {
+    throw UnimplementedError();
+  }
+
   void sessionEnterOrLeave(
       {required UuidValue sessionId, required bool enter, dynamic hint}) {
-    throw UnimplementedError();
+    js.context.callMethod('setByName', ['enter_or_leave', enter]);
   }
 
   Future<void> sessionInputKey(
@@ -460,7 +476,7 @@ class RustdeskImpl {
       required String name,
       required String value,
       dynamic hint}) {
-    return Future(() => js.context.callMethod('SetByName', [
+    return Future(() => js.context.callMethod('setByName', [
           'option:session',
           jsonEncode({'name': name, 'value': value})
         ]));
@@ -592,7 +608,7 @@ class RustdeskImpl {
 
   Future<void> sessionElevateDirect(
       {required UuidValue sessionId, dynamic hint}) {
-    throw UnimplementedError();
+    return Future(() => js.context.callMethod('setByName', ['elevate_direct']));
   }
 
   Future<void> sessionElevateWithLogon(
@@ -602,7 +618,7 @@ class RustdeskImpl {
       dynamic hint}) {
     return Future(() => js.context.callMethod('setByName', [
           'elevate_with_logon',
-          jsonEncode({username, password})
+          jsonEncode({'username': username, 'password': password})
         ]));
   }
 
@@ -644,7 +660,15 @@ class RustdeskImpl {
   }
 
   String mainGetLoginDeviceInfo({dynamic hint}) {
-    throw UnimplementedError();
+    String userAgent = html.window.navigator.userAgent;
+    String appName = html.window.navigator.appName;
+    String appVersion = html.window.navigator.appVersion;
+    String? platform = html.window.navigator.platform;
+    return jsonEncode({
+      'os': '$userAgent, $appName $appVersion ($platform)',
+      'type': 'Web client',
+      'name': js.context.callMethod('getByName', ['my_name']),
+    });
   }
 
   Future<void> mainChangeId({required String newId, dynamic hint}) {
@@ -725,7 +749,8 @@ class RustdeskImpl {
   }
 
   Future<String> mainGetLicense({dynamic hint}) {
-    throw UnimplementedError();
+    // TODO: implement
+    return Future(() => '');
   }
 
   Future<String> mainGetVersion({dynamic hint}) {
@@ -825,24 +850,29 @@ class RustdeskImpl {
   }
 
   String mainGetInputSource({dynamic hint}) {
-    // // rdev grab mode
-    // const CONFIG_INPUT_SOURCE_1 = "Input source 1";
+    final inputSource =
+        js.context.callMethod('getByName', ['option:local', 'input-source']);
+    // // js grab mode
+    // export const CONFIG_INPUT_SOURCE_1 = "Input source 1";
     // // flutter grab mode
-    // const CONFIG_INPUT_SOURCE_2 = "Input source 2";
-    return 'Input source 2';
+    // export const CONFIG_INPUT_SOURCE_2 = "Input source 2";
+    return inputSource != '' ? inputSource : 'Input source 1';
   }
 
   Future<void> mainSetInputSource(
       {required UuidValue sessionId, required String value, dynamic hint}) {
-    return Future.value();
+    return Future(() => js.context.callMethod('setByName', [
+          'option:local',
+          jsonEncode({'name': 'input-source', 'value': value})
+        ]));
   }
 
   Future<String> mainGetMyId({dynamic hint}) {
-    throw UnimplementedError();
+    return Future(() => js.context.callMethod('getByName', ['my_id']));
   }
 
   Future<String> mainGetUuid({dynamic hint}) {
-    throw UnimplementedError();
+    return Future(() => js.context.callMethod('getByName', ['uuid']));
   }
 
   Future<String> mainGetPeerOption(
@@ -906,7 +936,7 @@ class RustdeskImpl {
   }
 
   Future<void> mainForgetPassword({required String id, dynamic hint}) {
-    return Future(() => js.context.callMethod('setByName', ['forget']));
+    return mainSetPeerOption(id: id, key: 'password', value: '');
   }
 
   Future<bool> mainPeerHasPassword({required String id, dynamic hint}) {
@@ -964,10 +994,11 @@ class RustdeskImpl {
 
   Future<void> mainSetUserDefaultOption(
       {required String key, required String value, dynamic hint}) {
-    return js.context.callMethod('getByName', [
+    js.context.callMethod('setByName', [
       'option:user:default',
       jsonEncode({'name': key, 'value': value})
     ]);
+    return Future.value();
   }
 
   String mainGetUserDefaultOption({required String key, dynamic hint}) {
@@ -1032,7 +1063,7 @@ class RustdeskImpl {
         () => js.context.callMethod('getByName', ['option', 'last_remote_id']));
   }
 
-  Future<String> mainGetSoftwareUpdateUrl({dynamic hint}) {
+  Future<void> mainGetSoftwareUpdateUrl({dynamic hint}) {
     throw UnimplementedError();
   }
 
@@ -1041,7 +1072,7 @@ class RustdeskImpl {
   }
 
   Future<String> mainGetLangs({dynamic hint}) {
-    throw UnimplementedError();
+    return Future(() => js.context.callMethod('getByName', ['langs']));
   }
 
   Future<String> mainGetTemporaryPassword({dynamic hint}) {
@@ -1053,7 +1084,7 @@ class RustdeskImpl {
   }
 
   Future<String> mainGetFingerprint({dynamic hint}) {
-    throw UnimplementedError();
+    return Future.value('');
   }
 
   Future<String> cmGetClientsState({dynamic hint}) {
@@ -1095,7 +1126,7 @@ class RustdeskImpl {
   }
 
   String mainSupportedHwdecodings({dynamic hint}) {
-    throw UnimplementedError();
+    return '{}';
   }
 
   Future<bool> mainIsRoot({dynamic hint}) {
@@ -1182,8 +1213,10 @@ class RustdeskImpl {
       required int index,
       required bool on,
       dynamic hint}) {
-    // TODO
-    throw UnimplementedError();
+    return Future(() => js.context.callMethod('setByName', [
+          'toggle_virtual_display',
+          jsonEncode({'index': index, 'on': on})
+        ]));
   }
 
   Future<void> mainSetHomeDir({required String home, dynamic hint}) {
@@ -1284,8 +1317,7 @@ class RustdeskImpl {
   }
 
   Future<String> mainGetBuildDate({dynamic hint}) {
-    // TODO
-    throw UnimplementedError();
+    return Future(() => js.context.callMethod('getByName', ['build_date']));
   }
 
   String translate(
@@ -1587,6 +1619,7 @@ class RustdeskImpl {
 
   String mainSupportedInputSource({dynamic hint}) {
     return jsonEncode([
+      ['Input source 1', 'input_source_1_tip'],
       ['Input source 2', 'input_source_2_tip']
     ]);
   }
@@ -1680,6 +1713,10 @@ class RustdeskImpl {
   }
 
   String installInstallOptions({dynamic hint}) {
+    throw UnimplementedError();
+  }
+
+  int mainMaxEncryptLen({dynamic hint}) {
     throw UnimplementedError();
   }
 
